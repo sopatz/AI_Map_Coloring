@@ -35,3 +35,19 @@ while (state not in states):
 
 print(f"{state} is a valid state to color")
 
+# Create subset of county border list where both the counties are in the user's desired state
+subset = [
+    row for row in county_borders
+    if row["County State"] == state and row["Neighbor State"] == state
+]
+
+print(f"Number of county borders in {state}:", len(subset))
+print(subset[:5])   # preview
+
+color_number = int(input("How many colors would you like to use? (4-5) "))
+while (color_number != 4 and color_number != 5):
+    print("Please select either '4' or '5'.")
+    color_number = input("How many colors would you like to use? (4-5) ")
+
+colors = set(range(color_number)) # just using numbers for each color for now
+print(colors)
