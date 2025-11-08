@@ -78,25 +78,31 @@
     <input id="colors" type="number" min="3" max="10" value="4"><br><br>
 
     <button onclick="runColoring()">Run</button>
+
+    <!-- Create pre-formatted text block for results to be added to and be displayed -->
     <pre id="output"></pre>
 
     <script type="text/javascript">
+        // Pyodide is a WebAssembly-based version of Python that runs directly in the browser
         let pyodideReadyPromise = loadPyodide();
 
+        // Pyodide runs asynchronously (needs to use 'await') so function needs to be async
         async function runColoring() {
+            // Wait for Pyodide to be fully loaded
             const pyodide = await pyodideReadyPromise;
 
             // Load county adjacency data file into Pyodide's in-memory file system
             const dataResponse = await fetch("county_adjacency2025.txt");
-            const dataText = await dataResponse.text();
+            const dataText = await dataResponse.text();  // read fetched file as text
+            // Write file into Pyodide’s virtual file system, so Python code running inside Pyodide can access it as if it were a real file
             pyodide.FS.writeFile("county_adjacency2025.txt", dataText);
 
-            // Load colorer.py into Pyodide's in-memory file system
+            // Load colorer.py into Pyodide's in-memory file system, just as we did with county adjacency data
             const response = await fetch("colorer.py");
             const code = await response.text();
             pyodide.FS.writeFile("colorer.py", code);
 
-            // Run python functions from colorer.py
+            // Run enclosed Python code in browser
             await pyodide.runPythonAsync(`
             from colorer import load_county_data, color_state_counties
 
@@ -114,6 +120,7 @@
                     result = f"Could not color all counties in {state} with {color_number} colors."
             `);
 
+            // Retrieves Python variable "result" from Pyodide's global scope and displays it in the "pre" block defined earlier
             document.getElementById("output").textContent = pyodide.globals.get("result");
         }
     </script>
