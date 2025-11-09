@@ -32,7 +32,7 @@ def load_county_data(filepath="county_adjacency2025.txt"):
     return county_borders, states
 
 
-def color_state_counties(state, color_number, county_borders):
+def color_state_counties(state, county_borders, user_colors):
     # Create subset of county border list where both the counties are in the user's desired state
     state_county_borders = [
         row for row in county_borders
@@ -42,7 +42,8 @@ def color_state_counties(state, color_number, county_borders):
     #print(f"Number of county borders in {state}:", len(state_county_borders))
     #print(state_county_borders[:5])   # preview
 
-    colors = set(range(color_number)) # just using numbers for each color for now
+    # 
+    colors = user_colors
     #print(colors)
 
 
@@ -181,28 +182,3 @@ def color_state_counties(state, color_number, county_borders):
     success = color_counties()  # Call backtracking county-coloring function
 
     return final_colors, success
-
-
-if __name__ == "__main__":
-    county_borders, states = load_county_data()
-
-    state = input("What state would you like to color? ").strip().upper() #wont be case-sensitive
-    while (state not in states):
-        print(f"{state} is NOT a valid state abbreviation in the dataset.\n")
-        state = input("What state would you like to color? ").strip().upper()
-
-    print(f"{state} is a valid state to color")
-
-    # Let user choose whether they want their map with 4 colors or 5
-    color_number = int(input("\nHow many colors would you like to use? (4-5) "))
-    while (color_number != 4 and color_number != 5):
-        print("Please select either '4' or '5'.")
-        color_number = int(input("How many colors would you like to use? (4-5) "))
-
-    color_assignments, success = color_state_counties(state, color_number, county_borders)
-
-    if success:
-        print("\nSuccessfully colored all counties!")
-    else:
-        print("\nCould not color all counties with the chosen number of colors.")
-    print("\nColor Assignments: ", color_assignments)

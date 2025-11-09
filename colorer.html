@@ -74,15 +74,69 @@
         </optgroup>
     </select><br><br>
 
-    <label for="colors">Number of Colors (4 or 5 recommended):</label>
-    <input id="colors" type="number" min="3" max="10" value="4"><br><br>
+    <label for="color_number">Number of Colors (4 or 5 recommended):</label>
+    <input id="color_number" type="number" min="1" max="8" value="4"><br><br>
+    <div id="colorPickers"></div> <!-- To put the color pickers into based on how many colors the user picked -->
+    <br>
 
-    <button onclick="runColoring()">Run</button>
+    <button onclick="runColoring()">Run</button><br><br>
 
     <!-- Create pre-formatted text block for results to be added to and be displayed -->
-    <pre id="output"></pre>
+    <pre id="output" style="max-width: 95vw; white-space: pre-wrap;"></pre>
 
     <script type="text/javascript">
+
+        const colorNumberInput = document.getElementById("color_number");
+
+        // Prevent user from inputting color number that is out of range
+        colorNumberInput.addEventListener("input", () => {
+            const min = parseInt(colorNumberInput.min);
+            const max = parseInt(colorNumberInput.max);
+            const value = parseInt(colorNumberInput.value);
+
+            // Put value back in allowed range if it goes outside of it
+            if (value < min) colorNumberInput.value = min;
+            if (value > max) colorNumberInput.value = max;
+        });
+
+        // Dynamically generate color pickers when user changes number of colors
+
+        // Run updateColorPickers function every time the "color_number" value changes
+        colorNumberInput.addEventListener("input", updateColorPickers);
+
+        // Function to create and update color pickers
+        function updateColorPickers() {
+            // Read current color number value and convert it to an integer
+            const numColors = parseInt(document.getElementById("color_number").value);
+
+            // Grab the div we are gonna put the color pickers into
+            const color_pickers = document.getElementById("colorPickers");
+
+            // Clear old color pickers
+            color_pickers.innerHTML = "";
+
+            // Actually create the "numColors" amount of color pickers
+            for (let i = 0; i < numColors; i++) {
+                const label = document.createElement("label");
+                label.textContent = `Color ${i + 1}: `;
+
+                // Create a color picker html element (the native browser color chooser)
+                const input = document.createElement("input");
+                input.type = "color";
+                input.id = `colorPicker${i}`;
+                // Create default values for each picker
+                input.value = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ff8000", "#8000ff"][i] || "#000000";
+
+                color_pickers.appendChild(label);
+                color_pickers.appendChild(input);
+                color_pickers.appendChild(document.createElement("br"));  // So that the next picker is on its own line
+            }
+        }
+
+        // Initialize color pickers at page startup
+        updateColorPickers();
+
+
         // Pyodide is a WebAssembly-based version of Python that runs directly in the browser
         let pyodideReadyPromise = loadPyodide();
 
@@ -107,17 +161,22 @@
             from colorer import load_county_data, color_state_counties
 
             state = "${document.getElementById('state').value}"
-            color_number = int(${document.getElementById('colors').value})
+
+            # Stringify transforms JavaScript array into list of strings that Python can read
+            # "..." is the spread operator that transforms the mapped array into a literal array
+            # Array.from(...).map transforms the colorPickers element into an array containing only its values (the hex values of each color)
+            user_colors = ${JSON.stringify([...Array.from(document.querySelectorAll('#colorPickers input')).map(i => i.value)])}
+            
             county_borders, states = load_county_data()
 
-            if state not in states:
+            if state not in states:  # should not happen, put it here just in case I messed up somewhere with my state dropdown
                 result = f"Error: {state} is not a valid state abbreviation."
             else:
-                colors, success = color_state_counties(state, color_number, county_borders)
+                colors, success = color_state_counties(state, county_borders, user_colors)
                 if success:
                     result = f"Successfully colored all counties in {state}!\\n\\nColor Assignments:\\n{colors}"
                 else:
-                    result = f"Could not color all counties in {state} with {color_number} colors."
+                    result = f"Could not color all counties in {state} with {len(user_colors)} colors."
             `);
 
             // Retrieves Python variable "result" from Pyodide's global scope and displays it in the "pre" block defined earlier
