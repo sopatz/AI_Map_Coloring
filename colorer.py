@@ -1,4 +1,5 @@
 import csv
+import random
 
 def load_county_data(filepath="county_adjacency2025.txt"):
     county_borders = []
@@ -23,12 +24,6 @@ def load_county_data(filepath="county_adjacency2025.txt"):
             # track unique states
             states.add(county_state)
 
-    # print(county_borders[0]) # list of dictionaries
-    # print(type(county_borders))
-    # print(type(county_borders[0]))
-    # print(states)
-    # print(len(states))
-
     return county_borders, states
 
 
@@ -38,13 +33,10 @@ def color_state_counties(state, county_borders, user_colors):
         row for row in county_borders
         if row["County State"] == state and row["Neighbor State"] == state
     ]
-
     #print(f"Number of county borders in {state}:", len(state_county_borders))
     #print(state_county_borders[:5])   # preview
 
-    # 
     colors = user_colors
-    #print(colors)
 
 
     # Get all unique counties in the selected state
@@ -58,18 +50,13 @@ def color_state_counties(state, county_borders, user_colors):
         if row["Neighbor State"] == state
     })
 
-    #print(f"\nNumber of counties in {state}: {len(counties_in_state)}")
-    #print(sorted(counties_in_state))
-
 
     # Create dictionary where keys are the county IDs and the values are the color set
     county_colors = {countyID: set(colors) for countyID in counties_in_state}
-    #print(county_colors)
 
 
     # Count how many borders (neighbors) each county has
     border_counts = {}
-
     for row in state_county_borders:
         id = row["County GEOID"]
 
@@ -80,15 +67,7 @@ def color_state_counties(state, county_borders, user_colors):
     for id in counties_in_state:
         border_counts[id] = border_counts.get(id, 0)
 
-    # Sort by border count (descending)
-    ranked_counties = sorted(border_counts.items(), key=lambda x: x[1], reverse=True)
-
-    # print("\nCounties ranked by number of borders:")
-    # for county_id, count in ranked_counties:
-    #     print(f"{county_id}: {count} borders")
-
-
-    #model county borders as graph-style adjacency list for easier usage
+    # Model county borders as graph-style adjacency list for easier usage
     adj_list = {county: set() for county in counties_in_state}
 
     for row in state_county_borders:
@@ -140,8 +119,8 @@ def color_state_counties(state, county_borders, user_colors):
         if not county:
             return True  # no uncolored counties left
 
-        # Iterate through available colors for the selected county (ascending)
-        for color in sorted(county_colors[county]):
+        # Iterate through available colors for the selected county (in random order)
+        for color in random.sample(list(county_colors[county]), len(county_colors[county])):
             # Confirm color is conflict-free with currently assigned neighbors
             if is_valid_color(county, color):
                 final_colors[county] = color # assign color to selected county

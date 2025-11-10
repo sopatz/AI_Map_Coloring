@@ -10,6 +10,7 @@
     <style>
         body {
             margin-left: 2%;
+            margin-bottom: 2%;
         }
     </style>
 </head>
@@ -165,12 +166,17 @@
             const code = await response.text();
             pyodide.FS.writeFile("colorer.py", code);
 
+            const state_dropdown = document.getElementById('state');
+            const state_abbrev = state_dropdown.value;
+            const state_name = state_dropdown.options[state_dropdown.selectedIndex].text;
+
             // Run enclosed Python code in browser
             await pyodide.runPythonAsync(`
             from colorer import load_county_data, color_state_counties
             import json
 
-            state = "${document.getElementById('state').value}"
+            state = "${state_abbrev}"
+            state_name = "${state_name}"
 
             # Stringify transforms JavaScript array into list of strings that Python can read
             # "..." is the spread operator that transforms the mapped array into a literal array
@@ -185,9 +191,9 @@
             else:
                 color_assignments, success = color_state_counties(state, county_borders, user_colors)
                 if success:
-                    result = f"Successfully colored all counties in {state}!"
+                    result = f"Successfully colored all counties in {state_name}!"
                 else:
-                    result = f"Could not color all counties in {state} with {len(user_colors)} colors."
+                    result = f"Could not color all counties in {state_name} with {len(user_colors)} colors."
                 # Produce JSON of color asssignments
                 color_assignments_json = json.dumps(color_assignments)
             `);
@@ -253,8 +259,10 @@
                 },
                 style: styleFeature,  // use styleFeature function to color each polygon
                 onEachFeature: function (feature, layer) {
-                    const c = getCountyCode(feature.properties) || "unknown";
-                    layer.bindPopup(`GEOID: ${c}`);
+                    const props = feature.properties || {};
+                    const geoid = getCountyCode(props) || "unknown";
+                    const name = props.coty_name_long || "Unnamed County";
+                    layer.bindPopup(`<strong>${name}</strong><br>GEOID: ${geoid}`);
                 }
             }).addTo(leafletMap);  // Put layer for current state on map
 
