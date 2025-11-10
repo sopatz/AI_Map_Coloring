@@ -2,9 +2,16 @@
 <html>
 
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <title>County Colorer</title>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        body {
+            margin-left: 2%;
+        }
+    </style>
 </head>
 
 <body>
@@ -84,6 +91,8 @@
     <!-- Create pre-formatted text block for results to be added to and be displayed -->
     <pre id="output" style="max-width: 95vw; white-space: pre-wrap;"></pre>
 
+    <div id="map" style="height: 520px; width: 95vw; margin-top: 12px; display: none;"></div>
+
     <script type="text/javascript">
 
         const colorNumberInput = document.getElementById("color_number");
@@ -159,6 +168,7 @@
             // Run enclosed Python code in browser
             await pyodide.runPythonAsync(`
             from colorer import load_county_data, color_state_counties
+            import json
 
             state = "${document.getElementById('state').value}"
 
@@ -171,18 +181,121 @@
 
             if state not in states:  # should not happen, put it here just in case I messed up somewhere with my state dropdown
                 result = f"Error: {state} is not a valid state abbreviation."
+                color_assignments_json = {}
             else:
-                colors, success = color_state_counties(state, county_borders, user_colors)
+                color_assignments, success = color_state_counties(state, county_borders, user_colors)
                 if success:
-                    result = f"Successfully colored all counties in {state}!\\n\\nColor Assignments:\\n{colors}"
+                    result = f"Successfully colored all counties in {state}!"
                 else:
                     result = f"Could not color all counties in {state} with {len(user_colors)} colors."
+                # Produce JSON of color asssignments
+                color_assignments_json = json.dumps(color_assignments)
             `);
 
             // Retrieves Python variable "result" from Pyodide's global scope and displays it in the "pre" block defined earlier
             document.getElementById("output").textContent = pyodide.globals.get("result");
+
+            let color_assignments_JSON = pyodide.globals.get("color_assignments_json")
+            let color_assignments = {}
+            try {
+                color_assignments = JSON.parse(color_assignments_JSON || "{}");
+            }
+            catch (e) {
+                console.error("Failed to parse colorsJSON: ", e, color_assignments_JSON);
+            }
+
+            // If there are any color assignments, show the map
+            if (Object.keys(color_assignments).length > 0) {
+                document.getElementById("map").style.display = "block";
+                showMap(color_assignments);
+            }
         }
+
+
+        let leafletMap = null;
+        let currentLayer = null;
+
+        async function showMap(color_assignments) {
+            // If map has not been created yet...
+            if (!leafletMap) {
+                // Create a Leaflet map inside the "map" element created earlier
+                // preferCanvas = use HTML canvas rendering (better performance when there's a lot of shapes)
+                // setView sets the initial map center and zoom to the containental US
+                leafletMap = L.map('map', { preferCanvas: true }).setView([39, -98], 4);
+
+                // Add base layer from OpenStreetMap
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 18,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(leafletMap);  // attach basemap to map object
+            }
+
+            // Remove previously colored map layer if it exists
+            if (currentLayer) {
+                leafletMap.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+
+            // Fetch the county boundary geojson file
+            const resp = await fetch('county_boundaries.geojson');
+            // Parse geojson into a JavaScript object
+            const geojson = await resp.json();
+
+            // Create GeoJSON layer with only the counties of the current state
+            currentLayer = L.geoJSON(geojson, {
+                // Filter down to only counties with a color currently assigned to them
+                filter: function (feature) {
+                    const props = feature.properties || {};
+                    const county = getCountyCode(props);
+                    // Check if county exists and is in our color assignments
+                    if (county && (county in color_assignments)) return true;
+                    return false;
+                },
+                style: styleFeature,  // use styleFeature function to color each polygon
+                onEachFeature: function (feature, layer) {
+                    const c = getCountyCode(feature.properties) || "unknown";
+                    layer.bindPopup(`GEOID: ${c}`);
+                }
+            }).addTo(leafletMap);  // Put layer for current state on map
+
+            // Zoom to the bounds of the current state if the map layer has valid geographical bounds
+            if (currentLayer && currentLayer.getBounds && currentLayer.getBounds().isValid()) {
+                leafletMap.fitBounds(currentLayer.getBounds(), { padding: [10, 10] });
+            }
+
+
+            // Helper function to get county code ("coty_code") from geojson
+            function getCountyCode(props) {
+                // Stop if county has no properties (shouldn't happen)
+                if (!props) return null;
+
+                // Try to retrieve property called "coty_code", null if it doesn't exist
+                let county_code = props.coty_code || null;
+
+                // If county code exists, convert to string and make sure it is 5 characters long
+                if (county_code) return String(county_code).padStart(5, '0');  // add leading zeros if needed
+                return null;
+            }
+
+            // Style function that consults the color assignments
+            function styleFeature(feature) {
+                const props = feature.properties || {};
+                const county_code = getCountyCode(props);  // get GEOID of county
+
+                // Check if county code exists and is in the current state's color assignments
+                // If yes: use that color for fill color, if no: color the county gray
+                const hex = (county_code && color_assignments[county_code]) ? color_assignments[county_code] : '#cccccc';  // default to gray as a fallback
+                return {
+                    color: '#222',  // border stroke color
+                    weight: 0.6,  // border thickness
+                    fillColor: hex,  // fill color retrieved from the color assignments
+                    fillOpacity: 0.85  // transparency
+                };
+            }
+        }
+
     </script>
+
 </body>
 
 </html>
