@@ -191,9 +191,9 @@
             else:
                 color_assignments, success = color_state_counties(state, county_borders, user_colors)
                 if success:
-                    result = f"Successfully colored all counties in {state_name}!"
+                    result = f"Successfully colored all counties or county equivalents in {state_name}!"
                 else:
-                    result = f"Could not color all counties in {state_name} with {len(user_colors)} colors."
+                    result = f"Could not color all counties or county equivalents in {state_name} with {len(user_colors)} colors."
                 # Produce JSON of color asssignments
                 color_assignments_json = json.dumps(color_assignments)
             `);
@@ -246,6 +246,9 @@
             const resp = await fetch('county_boundaries.geojson');
             // Parse geojson into a JavaScript object
             const geojson = await resp.json();
+            // Fix Aleutian Islands wrap-around issue
+            fixAlaskaCoordinates(geojson);
+
 
             // Create GeoJSON layer with only the counties of the current state
             currentLayer = L.geoJSON(geojson, {
@@ -271,6 +274,10 @@
                 leafletMap.fitBounds(currentLayer.getBounds(), { padding: [10, 10] });
             }
 
+
+            // ================== //
+            //  HELPER FUNCTIONS  //
+            // ================== //
 
             // Helper function to get county code ("coty_code") from geojson
             function getCountyCode(props) {
@@ -299,6 +306,35 @@
                     fillColor: hex,  // fill color retrieved from the color assignments
                     fillOpacity: 0.85  // transparency
                 };
+            }
+
+            // Fix Aleutian Islands wrap-around issue
+            function fixAlaskaCoordinates(geojson) {
+                // Iterate over each feature in dataset
+                geojson.features.forEach(feature => {
+                    // Grab geometry object for current feature (type and coordinates)
+                    const geom = feature.geometry;
+                    // Make sure geometry exists and actually has coordinates before messing with them
+                    if (geom && geom.coordinates) {
+                        // Define recursive inner helper function to walk through nested coordinate arrays
+                        const fixCoords = coords => {
+                            return coords.map(c => {
+                                // If more info is nested further (not yet at lat and long) walk further using recursive call
+                                if (Array.isArray(c[0])) return fixCoords(c);
+                                const [lon, lat] = c;
+                                // Return new coordinate pair with longitude possibly normalized
+                                return [normalizeLongitude(lon), lat];
+                            });
+                        };
+                        // Replace geometry's coordinates with the normalized coordinates produced by fixCoords
+                        geom.coordinates = fixCoords(geom.coordinates);
+                    }
+                });
+            }
+
+            function normalizeLongitude(lon) {
+                // If longitude is greater than 0 but should be mapped in western hemisphere instead of eastern, shift by -360
+                return lon > 0 ? lon - 360 : lon;
             }
         }
 
