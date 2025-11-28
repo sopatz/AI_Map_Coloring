@@ -93,6 +93,8 @@
     <pre id="output" style="max-width: 95vw; white-space: pre-wrap;"></pre>
 
     <div id="map" style="height: 520px; width: 95vw; margin-top: 12px; display: none;"></div>
+    <br>
+    <button id="downloadGeoJSONButton" style="display:none;" onclick="downloadGeoJSON()">Download GeoJSON</button>
 
     <script type="text/javascript">
 
@@ -212,6 +214,8 @@
 
             // If there are any color assignments, show the map
             if (Object.keys(color_assignments).length > 0) {
+                // Expose color assignments globally so export code can use it
+                window.color_assignments_global = color_assignments;
                 document.getElementById("map").style.display = "block";
                 showMap(color_assignments);
             }
@@ -274,6 +278,7 @@
                 leafletMap.fitBounds(currentLayer.getBounds(), { padding: [10, 10] });
             }
 
+            showDownloadButton();
 
             // ================== //
             //  HELPER FUNCTIONS  //
@@ -336,6 +341,80 @@
                 // If longitude is greater than 0 but should be mapped in western hemisphere instead of eastern, shift by -360
                 return lon > 0 ? lon - 360 : lon;
             }
+        }
+
+        // Show the download button once a map layer is colored
+        function showDownloadButton() {
+            const geojsonButton = document.getElementById("downloadGeoJSONButton");
+            // Only show button if there is a map coloring on the screen
+            geojsonButton.style.display = currentLayer ? "inline-block" : "none";
+        }
+
+        // Build a GeoJSON from the current layer and attach the color property
+        function buildColoredGeoJSON() {
+            if (!currentLayer) return null;
+            // Create a FeatureCollection from the current layer
+            const feature_collection = currentLayer.toGeoJSON();
+
+            // Iterate through each feature in the feature collection and add a new property for the fill color
+            feature_collection.features.forEach(feature => {
+                const props = feature.properties || {};
+
+                // Grab the feature's GEOID
+                const geoid = String(props.coty_code || "").padStart(5, '0');
+
+                // Check if there is a global object of color assignments and that there is a color assignment keyed by the current GEOID
+                if (window.color_assignments_global && geoid && window.color_assignments_global[geoid]) {
+                    // Store the current county's color assignment in a new property called "fill"
+                    props.fill = window.color_assignments_global[geoid];
+                } else {
+                    // Default to gray as a fallback like the map does
+                    props.fill = '#cccccc';
+                }
+                // Update feature in GeoJSON with its new property
+                feature.properties = props;
+            });
+
+            return feature_collection;
+        }
+
+        // Trigger a browser download for GeoJSON
+        function downloadGeoJSON() {
+            // Get collection of all the county features, each with a new "fill" property
+            const feature_collection = buildColoredGeoJSON();
+
+            // Stop export of there is a problem with the feature collection (should not happen)
+            if (!feature_collection) {
+                alert("No colored layer to export.");
+                return;
+            }
+
+            // Get state abbreviation from page for file-naming purposes
+            const stateAbbrev = (document.getElementById('state')).value;
+
+            // Build file name using state abbreviation
+            const filename = `${stateAbbrev}_colored.geojson`;
+
+            // Turn JSON strings into Blob object, letting the browser treat the data like a downloadable file
+            const blob = new Blob([JSON.stringify(feature_collection, null, 2)], { type: "application/geo+json;charset=utf-8" });
+
+            // Create URL pointing to the Blob object so that the browser can download it
+            const url = URL.createObjectURL(blob);
+
+            // Create new <a> element to use to trigger the download
+            const a = document.createElement("a");
+
+            // Set the <a> element's href and download attributes
+            a.href = url;
+            a.download = filename;
+
+            // Add the <a> download link element to the page, make the browser click it, then immediately remove it
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // Release URL from memory to avoid memory leaks
+            URL.revokeObjectURL(url);
         }
 
     </script>
