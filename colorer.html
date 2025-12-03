@@ -159,7 +159,7 @@
 
             // Load county adjacency data file into Pyodide's in-memory file system
             const dataResponse = await fetch("county_adjacency2025.txt");
-            const dataText = await dataResponse.text();  // read fetched file as text
+            const dataText = await dataResponse.text();  // Read fetched file as text
             // Write file into Pyodide’s virtual file system, so Python code running inside Pyodide can access it as if it were a real file
             pyodide.FS.writeFile("county_adjacency2025.txt", dataText);
 
@@ -293,14 +293,14 @@
                 let county_code = props.coty_code || null;
 
                 // If county code exists, convert to string and make sure it is 5 characters long
-                if (county_code) return String(county_code).padStart(5, '0');  // add leading zeros if needed
+                if (county_code) return String(county_code).padStart(5, '0');  // Add leading zeros if needed
                 return null;
             }
 
             // Style function that consults the color assignments
             function styleFeature(feature) {
                 const props = feature.properties || {};
-                const county_code = getCountyCode(props);  // get GEOID of county
+                const county_code = getCountyCode(props);  // Get GEOID of county
 
                 // Check if county code exists and is in the current state's color assignments
                 // If yes: use that color for fill color, if no: color the county gray

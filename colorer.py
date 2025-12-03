@@ -21,7 +21,7 @@ def load_county_data(filepath="county_adjacency2025.txt"):
 
             county_borders.append(row)
 
-            # track unique states
+            # Track unique states
             states.add(county_state)
 
     return county_borders, states
@@ -60,8 +60,8 @@ def color_state_counties(state, county_borders, user_colors):
     for row in state_county_borders:
         id = row["County GEOID"]
 
-        # for every county ID in a border, add 1
-        border_counts[id] = border_counts.get(id, 0) + 1 #if id does not exist in border_counts yet, give it default value of 0
+        # For every county ID in a border, add 1
+        border_counts[id] = border_counts.get(id, 0) + 1  # If id does not exist in border_counts yet, give it default value of 0
 
     # Add counties with no borders to list with value of zero
     for id in counties_in_state:
@@ -102,7 +102,17 @@ def color_state_counties(state, county_borders, user_colors):
             return None  #signal that all counties are colored
         # Sort by number of options (ascending), then number of borders (descending)
         uncolored.sort(key=lambda x: (x[1], -x[2], x[0]))
+        # Logic to choose random tied county instead of first one, can uncomment if wanted, but does not help anything
+        '''
+        # Get the best county from sorting
+        best_county = uncolored[0]
+        # Find all counties that are tied for the best county, so we can choose a random county from them
+        tied_for_best = [uncolored_county for uncolored_county in uncolored if 
+                         uncolored_county[1] == best_county[1] and 
+                         uncolored_county[2] == best_county[2]]
         # Return first county in sorted uncolored county list, as this is the one we now choose to color
+        return random.choice(tied_for_best)[0]
+        '''
         return uncolored[0][0]
 
     # Recursive function that performs map coloring with backtracking
@@ -117,13 +127,13 @@ def color_state_counties(state, county_borders, user_colors):
         county = select_next_county()
         # Check if county == None
         if not county:
-            return True  # no uncolored counties left
+            return True  # No uncolored counties left
 
         # Iterate through available colors for the selected county (in random order)
         for color in random.sample(list(county_colors[county]), len(county_colors[county])):
             # Confirm color is conflict-free with currently assigned neighbors
             if is_valid_color(county, color):
-                final_colors[county] = color # assign color to selected county
+                final_colors[county] = color  # Assign color to selected county
 
 
                 # Temporarily reduce neighbor color options for pruning:
@@ -143,7 +153,7 @@ def color_state_counties(state, county_borders, user_colors):
 
                 # Recursive call
                 if color_counties():
-                    return True  # stop iteration if full solution was found
+                    return True  # Stop iteration if full solution was found
 
                 # If recursive call fails:
 
